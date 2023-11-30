@@ -1,12 +1,14 @@
 package proxy
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"io"
 	"log"
 	"net"
 	"os"
+	"sync"
 )
 
 type Config struct {
@@ -80,22 +82,49 @@ func (p *Proxy) Start() error {
 }
 
 func (p *Proxy) handleConn(conn net.Conn) {
+	log.Printf("proxy: handler: forward")
+	defer log.Printf("proxy: handler: done")
 
 	upstrmConn, err := net.Dial("tcp", p.config.UpstreamAddr)
 	if err != nil {
+		// N.B. Close connect if upstream dial fail
+		if err := conn.Close(); err != nil {
+			log.Printf("proxy: handler: conn close: %v", err)
+		}
 		log.Printf("proxy: handler: upstream dial: %v", err)
 		return
 	}
 
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
+	ctx, forwardCancel := context.WithCancel(context.Background())
+
+	// forward conn->upstream and upstream-> conn
+	wg.Add(1)
 	go func() {
-		_, err := io.Copy(upstrmConn, conn)
-		if err != nil {
+		defer wg.Done()
+		defer forwardCancel()
+		if _, err := io.Copy(upstrmConn, conn); err != nil {
 			log.Printf("proxy: handler: forward conn to upstrmConn: %v", err)
 			return
 		}
 	}()
-	if _, err := io.Copy(conn, upstrmConn); err != nil {
-		log.Printf("proxy: handler: forward upstrmConn to conn: %v", err)
-		return
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer forwardCancel()
+		if _, err := io.Copy(conn, upstrmConn); err != nil {
+			log.Printf("proxy: handler: forward upstrmConn to conn: %v", err)
+			return
+		}
+	}()
+
+	// lock until context close by copy goroutines
+	<-ctx.Done()
+	if err := conn.Close(); err != nil {
+		log.Printf("proxy: handler: copy fail, conn close: %v", err)
+	}
+	if err := upstrmConn.Close(); err != nil {
+		log.Printf("proxy: handler: copy fail, upstream close: %v", err)
 	}
 }
