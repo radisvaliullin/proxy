@@ -49,7 +49,7 @@ func (p *Proxy) Start() error {
 	// server side certificate
 	srvCert, err := tls.LoadX509KeyPair(p.config.SrvCertPath, p.config.SrvKeyPath)
 	if err != nil {
-		log.Fatalf("proxy: start: server cert load: %v", err)
+		log.Printf("proxy: start: server cert load: %v", err)
 		return nil
 	}
 
@@ -64,7 +64,7 @@ func (p *Proxy) Start() error {
 
 	ln, err := tls.Listen("tcp", p.config.Addr, srvMTLSConf)
 	if err != nil {
-		log.Fatalf("proxy: start: listen: %v", err)
+		log.Printf("proxy: start: listen: %v", err)
 		return err
 	}
 
