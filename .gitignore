@@ -1,2 +1,6 @@
 # ignore secret folder
 /sec
+
+# ignore config folder (exclude examples)
+/config/*
+!config/example.*

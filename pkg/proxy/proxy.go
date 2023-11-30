@@ -12,15 +12,15 @@ import (
 type Config struct {
 	// mTLS
 	// Client CA Cert file path
-	ClnCACertPath string
+	ClnCACertPath string `yaml:"clientCACertPath"`
 	// Server Cert and Key file path
-	SrvCertPath string
-	SrvKeyPath  string
+	SrvCertPath string `yaml:"serverCertPath"`
+	SrvKeyPath  string `yaml:"serverKeyPath"`
 
 	// Proxy Addr (ip/port)
-	Addr string
+	Addr string `yaml:"addr"`
 	// Upstream Addr (ip/port)
-	UpstreamAddr string
+	UpstreamAddr string `yaml:"upstreamAddr"`
 }
 
 type Proxy struct {
