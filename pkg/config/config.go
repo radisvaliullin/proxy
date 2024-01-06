@@ -4,12 +4,14 @@ import (
 	"log"
 	"os"
 
+	"github.com/radisvaliullin/proxy/pkg/auth"
 	"github.com/radisvaliullin/proxy/pkg/proxy"
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
 	Proxy proxy.Config `yaml:"proxy"`
+	Auth  auth.Config  `yaml:"auth"`
 }
 
 func New() (Config, error) {
