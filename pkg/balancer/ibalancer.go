@@ -1,6 +1,5 @@
 package balancer
 
 type IBalancer interface {
-	Balance(string) (string, error)
-	Close(string)
+	Balance(string) (Upstream, error)
 }

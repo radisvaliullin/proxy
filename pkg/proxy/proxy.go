@@ -106,15 +106,15 @@ func (p *Proxy) handleConn(conn net.Conn) {
 	}
 
 	// get upstream address
-	uAddr, err := p.blncer.Balance(clnId)
+	upstr, err := p.blncer.Balance(clnId)
 	if err != nil {
 		log.Printf("proxy: handler: conn balance, get upstream addr: %v", err)
 		return
 	}
-	defer p.blncer.Close(clnId)
+	defer upstr.Close()
 
 	// dial upstream
-	upstrmConn, err := net.Dial("tcp", uAddr)
+	upstrmConn, err := net.Dial("tcp", upstr.Addr())
 	if err != nil {
 		log.Printf("proxy: handler: upstream dial: %v", err)
 		return

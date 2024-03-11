@@ -6,12 +6,14 @@ const (
 	ErrKindClientNotConfig = iota
 	ErrKindClientExceedLimti
 	ErrKindCanNotGetUpstream
+	ErrKindConfigWrongUpstr
 )
 
 var (
 	ErrClientNotConfig   = BalancerError{Kind: ErrKindClientNotConfig}
 	ErrClientExceedLimti = BalancerError{Kind: ErrKindClientExceedLimti}
 	ErrCanNotGetUpstream = BalancerError{Kind: ErrKindCanNotGetUpstream}
+	ErrConfigWrongUpstr  = BalancerError{Kind: ErrKindConfigWrongUpstr}
 )
 
 func getErrorMessage(kind int) string {
@@ -22,6 +24,8 @@ func getErrorMessage(kind int) string {
 		return "client has exceeded limit"
 	case ErrKindCanNotGetUpstream:
 		return "can not get next upstream"
+	case ErrKindConfigWrongUpstr:
+		return "config, wrong upstream address"
 	default:
 		return "unknown"
 	}

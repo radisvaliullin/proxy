@@ -4,3 +4,6 @@
 # ignore config folder (exclude examples)
 /config/*
 !config/example.*
+
+# tmp
+/tmp
