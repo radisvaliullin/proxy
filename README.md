@@ -29,4 +29,5 @@ go run cmd/proxy/main.go
 or build and run from binary
 ```
 go build -o bin/proxy cmd/proxy/main.go
+./bin/proxy
 ```
