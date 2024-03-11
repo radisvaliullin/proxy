@@ -24,11 +24,14 @@ func main() {
 	blnConf := balancer.Config{UpstrmAddrs: config.Proxy.UpstreamAddrs}
 	blncer, err := balancer.New(blnConf, au)
 	if err != nil {
-		log.Fatalf("main: balancer: %v", err)
+		log.Fatalf("main: balancer init: %v", err)
 	}
 
 	// init proxy and start
-	p := proxy.New(config.Proxy, au, blncer)
+	p, err := proxy.New(config.Proxy, au, blncer)
+	if err != nil {
+		log.Fatalf("main: proxy init: %v", err)
+	}
 	if err := p.Start(); err != nil {
 		log.Fatalf("main: proxy start: %v", err)
 	}

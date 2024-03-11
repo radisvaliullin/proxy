@@ -15,20 +15,6 @@ import (
 	"github.com/radisvaliullin/proxy/pkg/balancer"
 )
 
-type Config struct {
-	// mTLS
-	// Client CA Cert file path
-	ClnCACertPath string `yaml:"clientCACertPath"`
-	// Server Cert and Key file path
-	SrvCertPath string `yaml:"serverCertPath"`
-	SrvKeyPath  string `yaml:"serverKeyPath"`
-
-	// Proxy Addr (ip/port)
-	Addr string `yaml:"addr"`
-	// Upstream Addrs (list of ip:port)
-	UpstreamAddrs []string `yaml:"upstreamAddrs"`
-}
-
 type Proxy struct {
 	config Config
 
@@ -36,13 +22,16 @@ type Proxy struct {
 	blncer balancer.IBalancer
 }
 
-func New(conf Config, au auth.IAuth, blncer balancer.IBalancer) *Proxy {
+func New(conf Config, au auth.IAuth, blncer balancer.IBalancer) (*Proxy, error) {
+	if err := conf.validate(); err != nil {
+		return nil, err
+	}
 	p := &Proxy{
 		config: conf,
 		auth:   au,
 		blncer: blncer,
 	}
-	return p
+	return p, nil
 }
 
 func (p *Proxy) Start() error {
@@ -129,8 +118,8 @@ func (p *Proxy) handleConn(conn net.Conn) {
 	sessCtx, sessCancel := context.WithCancel(context.Background())
 
 	// forward conn->upstream and upstream->conn
-	hbDuration := time.Duration(time.Second * 10)
-	rwBuffSize := 2048
+	hbDuration := time.Duration(time.Second * time.Duration(p.config.HeartbeatTimeout))
+	rwBuffSize := p.config.ForwardBuffSize
 	wg.Add(1)
 	go func() {
 		wg.Done()

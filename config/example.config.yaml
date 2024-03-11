@@ -4,6 +4,12 @@ proxy:
   serverKeyPath: ./sec/key.pem
   addr: ":4000"
   upstreamAddrs: [":4001", ":4002", ":4003", ":4004"]
+  # in seconds (default value 10s)
+  # (optional)
+  heartbeatTimeout: 10
+  # default value 2048
+  # (optional)
+  forwardBuffSize: 2048
 
 auth:
   clients:
