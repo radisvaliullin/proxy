@@ -11,6 +11,7 @@ import (
 	"os"
 
 	"github.com/radisvaliullin/proxy/pkg/auth"
+	"github.com/radisvaliullin/proxy/pkg/balancer"
 )
 
 type Config struct {
@@ -30,13 +31,15 @@ type Config struct {
 type Proxy struct {
 	config Config
 
-	auth auth.IAuth
+	auth   auth.IAuth
+	blncer balancer.IBalancer
 }
 
-func New(conf Config, au auth.IAuth) *Proxy {
+func New(conf Config, au auth.IAuth, blncer balancer.IBalancer) *Proxy {
 	p := &Proxy{
 		config: conf,
 		auth:   au,
+		blncer: blncer,
 	}
 	return p
 }
@@ -96,16 +99,20 @@ func (p *Proxy) handleConn(conn net.Conn) {
 	}()
 
 	// auth connection
-	if err := p.authzConn(conn); err != nil {
+	clnId, err := p.authzConn(conn)
+	if err != nil {
 		log.Printf("proxy: handler: conn auth: %v", err)
 		return
 	}
 
-	// dial upstream
-	uAddr := ""
-	if len(p.config.UpstreamAddrs) > 0 {
-		uAddr = p.config.UpstreamAddrs[0]
+	// get upstream address
+	uAddr, err := p.blncer.Balance(clnId)
+	if err != nil {
+		log.Printf("proxy: handler: conn balance, get upstream addr: %v", err)
+		return
 	}
+
+	// dial upstream
 	upstrmConn, err := net.Dial("tcp", uAddr)
 	if err != nil {
 		log.Printf("proxy: handler: upstream dial: %v", err)
@@ -142,27 +149,27 @@ func (p *Proxy) handleConn(conn net.Conn) {
 	<-fwdCtx.Done()
 }
 
-func (a *Proxy) authzConn(conn net.Conn) error {
+func (a *Proxy) authzConn(conn net.Conn) (string, error) {
 	var (
 		tc *tls.Conn
 		ok bool
 	)
 	if tc, ok = conn.(*tls.Conn); !ok {
-		return nil
+		return "", errors.New("tcp conn is not tls")
 	}
 	if err := tc.Handshake(); err != nil {
 		log.Printf("proxy: handler: conn handshake: %v", err)
-		return err
+		return "", err
 	}
 	cs := tc.ConnectionState()
 	if len(cs.PeerCertificates) <= 0 {
 		log.Printf("proxy: handler: conn state, peer certificates not found")
-		return errors.New("tls conn state, peer certificates not found")
+		return "", errors.New("tls conn state, peer certificates not found")
 	}
 	id := cs.PeerCertificates[0].Subject.CommonName
 	if !a.auth.AuthZ(id) {
-		return errors.New("tls conn, cert common name not authz")
+		return "", errors.New("tls conn, cert common name not authz")
 	}
 
-	return nil
+	return id, nil
 }

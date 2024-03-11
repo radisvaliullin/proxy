@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/radisvaliullin/proxy/pkg/auth"
+	"github.com/radisvaliullin/proxy/pkg/balancer"
 	"github.com/radisvaliullin/proxy/pkg/config"
 	"github.com/radisvaliullin/proxy/pkg/proxy"
 )
@@ -19,9 +20,12 @@ func main() {
 
 	// init dependencies
 	au := auth.New(config.Auth)
+	// balancer
+	blnConf := balancer.Config{UpstrmAddrs: config.Proxy.UpstreamAddrs}
+	blncer := balancer.New(blnConf)
 
 	// init proxy and start
-	p := proxy.New(config.Proxy, au)
+	p := proxy.New(config.Proxy, au, blncer)
 	if err := p.Start(); err != nil {
 		log.Fatalf("main: proxy start: %v", err)
 	}
