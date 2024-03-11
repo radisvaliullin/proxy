@@ -105,7 +105,8 @@ func (p *Proxy) handleConn(conn net.Conn) {
 	defer upstr.Close()
 
 	// dial upstream
-	upstrmConn, err := net.Dial("tcp", upstr.Addr())
+	dialer := DefaultDialer()
+	upstrmConn, err := dialer.Dial("tcp", upstr.Addr())
 	if err != nil {
 		log.Printf("proxy: handler: upstream dial: %v", err)
 		return
