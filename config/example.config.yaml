@@ -1,0 +1,7 @@
+proxy:
+  clientCACertPath: ./sec/clientcacert.pem
+  serverCertPath: ./sec/cert.pem
+  serverKeyPath: ./sec/key.pem
+  addr: ":4000"
+  upstreamAddr: ":4001"
+ 
