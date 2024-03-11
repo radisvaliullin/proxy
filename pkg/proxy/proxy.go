@@ -111,6 +111,7 @@ func (p *Proxy) handleConn(conn net.Conn) {
 		log.Printf("proxy: handler: conn balance, get upstream addr: %v", err)
 		return
 	}
+	defer p.blncer.Close(clnId)
 
 	// dial upstream
 	upstrmConn, err := net.Dial("tcp", uAddr)

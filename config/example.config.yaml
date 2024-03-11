@@ -11,6 +11,7 @@ auth:
       id: client@client.org
       perms:
         upstreamAddrs: [":4002", ":4004"]
+        limit: 1000
     - client:
       id: client2@client.org
       perms:

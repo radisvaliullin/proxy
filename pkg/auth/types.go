@@ -7,6 +7,7 @@ type Client struct {
 
 type Perms struct {
 	UpstreamAddrs []string `yaml:"upstreamAddrs"`
+	Limit         int      `yaml:"limit"`
 }
 
 type Clients []Client
