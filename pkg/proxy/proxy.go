@@ -5,10 +5,11 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"io"
 	"log"
 	"net"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/radisvaliullin/proxy/pkg/auth"
 	"github.com/radisvaliullin/proxy/pkg/balancer"
@@ -92,11 +93,12 @@ func (p *Proxy) Start() error {
 func (p *Proxy) handleConn(conn net.Conn) {
 	log.Printf("proxy: handler: forward")
 	defer log.Printf("proxy: handler: done")
-	defer func() {
-		if err := conn.Close(); err != nil {
-			log.Printf("proxy: handler: conn close: %v", err)
-		}
-	}()
+
+	// handler wait group, wait when all child goroutine done
+	wg := sync.WaitGroup{}
+	wg.Wait()
+	// conn close (release read/write operations)
+	defer connCloseWithLog(conn)
 
 	// auth connection
 	clnId, err := p.authzConn(conn)
@@ -119,35 +121,37 @@ func (p *Proxy) handleConn(conn net.Conn) {
 		log.Printf("proxy: handler: upstream dial: %v", err)
 		return
 	}
-	defer func() {
-		if err := upstrmConn.Close(); err != nil {
-			log.Printf("proxy: handler: upstream close: %v", err)
-		}
-	}()
+	defer connCloseWithLog(upstrmConn)
 
-	// cancel forward goroutines
-	// if one of forward functions fail when context canceled
+	// cancel session
+	// if one of forward functions fail when need graceful cancel session
 	// and conn handler should return and defer conn close
-	fwdCtx, forwardCancel := context.WithCancel(context.Background())
+	sessCtx, sessCancel := context.WithCancel(context.Background())
 
 	// forward conn->upstream and upstream->conn
+	hbDuration := time.Duration(time.Second * 10)
+	rwBuffSize := 2048
+	wg.Add(1)
 	go func() {
-		defer forwardCancel()
-		if _, err := io.Copy(upstrmConn, conn); err != nil {
+		wg.Done()
+		defer sessCancel()
+		if err := streamForwarderWithHeartbeat(sessCancel, upstrmConn, conn, hbDuration, rwBuffSize); err != nil {
 			log.Printf("proxy: handler: forward conn to upstrmConn: %v", err)
 			return
 		}
 	}()
+	wg.Add(1)
 	go func() {
-		defer forwardCancel()
-		if _, err := io.Copy(conn, upstrmConn); err != nil {
+		wg.Done()
+		defer sessCancel()
+		if err := streamForwarderWithHeartbeat(sessCancel, conn, upstrmConn, hbDuration, rwBuffSize); err != nil {
 			log.Printf("proxy: handler: forward upstrmConn to conn: %v", err)
 			return
 		}
 	}()
 
 	// lock until context canceled by one of forward goroutines
-	<-fwdCtx.Done()
+	<-sessCtx.Done()
 }
 
 func (a *Proxy) authzConn(conn net.Conn) (string, error) {
