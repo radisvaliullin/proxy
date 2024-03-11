@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"io"
 	"log"
 	"net"
 	"os"
-	"sync"
+
+	"github.com/radisvaliullin/proxy/pkg/auth"
 )
 
 type Config struct {
@@ -21,17 +23,20 @@ type Config struct {
 
 	// Proxy Addr (ip/port)
 	Addr string `yaml:"addr"`
-	// Upstream Addr (ip/port)
-	UpstreamAddr string `yaml:"upstreamAddr"`
+	// Upstream Addrs (list of ip:port)
+	UpstreamAddrs []string `yaml:"upstreamAddrs"`
 }
 
 type Proxy struct {
 	config Config
+
+	auth auth.IAuth
 }
 
-func New(conf Config) *Proxy {
+func New(conf Config, au auth.IAuth) *Proxy {
 	p := &Proxy{
 		config: conf,
+		auth:   au,
 	}
 	return p
 }
@@ -84,34 +89,48 @@ func (p *Proxy) Start() error {
 func (p *Proxy) handleConn(conn net.Conn) {
 	log.Printf("proxy: handler: forward")
 	defer log.Printf("proxy: handler: done")
-
-	upstrmConn, err := net.Dial("tcp", p.config.UpstreamAddr)
-	if err != nil {
-		// N.B. Close connect if upstream dial fail
+	defer func() {
 		if err := conn.Close(); err != nil {
 			log.Printf("proxy: handler: conn close: %v", err)
 		}
-		log.Printf("proxy: handler: upstream dial: %v", err)
+	}()
+
+	// auth connection
+	if err := p.authzConn(conn); err != nil {
+		log.Printf("proxy: handler: conn auth: %v", err)
 		return
 	}
 
-	wg := sync.WaitGroup{}
-	defer wg.Wait()
-	ctx, forwardCancel := context.WithCancel(context.Background())
+	// dial upstream
+	uAddr := ""
+	if len(p.config.UpstreamAddrs) > 0 {
+		uAddr = p.config.UpstreamAddrs[0]
+	}
+	upstrmConn, err := net.Dial("tcp", uAddr)
+	if err != nil {
+		log.Printf("proxy: handler: upstream dial: %v", err)
+		return
+	}
+	defer func() {
+		if err := upstrmConn.Close(); err != nil {
+			log.Printf("proxy: handler: upstream close: %v", err)
+		}
+	}()
 
-	// forward conn->upstream and upstream-> conn
-	wg.Add(1)
+	// cancel forward goroutines
+	// if one of forward functions fail when context canceled
+	// and conn handler should return and defer conn close
+	fwdCtx, forwardCancel := context.WithCancel(context.Background())
+
+	// forward conn->upstream and upstream->conn
 	go func() {
-		defer wg.Done()
 		defer forwardCancel()
 		if _, err := io.Copy(upstrmConn, conn); err != nil {
 			log.Printf("proxy: handler: forward conn to upstrmConn: %v", err)
 			return
 		}
 	}()
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
 		defer forwardCancel()
 		if _, err := io.Copy(conn, upstrmConn); err != nil {
 			log.Printf("proxy: handler: forward upstrmConn to conn: %v", err)
@@ -119,12 +138,31 @@ func (p *Proxy) handleConn(conn net.Conn) {
 		}
 	}()
 
-	// lock until context close by copy goroutines
-	<-ctx.Done()
-	if err := conn.Close(); err != nil {
-		log.Printf("proxy: handler: copy fail, conn close: %v", err)
+	// lock until context canceled by one of forward goroutines
+	<-fwdCtx.Done()
+}
+
+func (a *Proxy) authzConn(conn net.Conn) error {
+	var (
+		tc *tls.Conn
+		ok bool
+	)
+	if tc, ok = conn.(*tls.Conn); !ok {
+		return nil
 	}
-	if err := upstrmConn.Close(); err != nil {
-		log.Printf("proxy: handler: copy fail, upstream close: %v", err)
+	if err := tc.Handshake(); err != nil {
+		log.Printf("proxy: handler: conn handshake: %v", err)
+		return err
 	}
+	cs := tc.ConnectionState()
+	if len(cs.PeerCertificates) <= 0 {
+		log.Printf("proxy: handler: conn state, peer certificates not found")
+		return errors.New("tls conn state, peer certificates not found")
+	}
+	id := cs.PeerCertificates[0].Subject.CommonName
+	if !a.auth.AuthZ(id) {
+		return errors.New("tls conn, cert common name not authz")
+	}
+
+	return nil
 }

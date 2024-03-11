@@ -3,5 +3,11 @@ proxy:
   serverCertPath: ./sec/cert.pem
   serverKeyPath: ./sec/key.pem
   addr: ":4000"
-  upstreamAddr: ":4001"
- 
+  upstreamAddrs: [":4001"]
+
+auth:
+  clients:
+    - client:
+      id: client@client.org
+    - client:
+      id: client2@client.org

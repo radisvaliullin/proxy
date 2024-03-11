@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 
+	"github.com/radisvaliullin/proxy/pkg/auth"
 	"github.com/radisvaliullin/proxy/pkg/config"
 	"github.com/radisvaliullin/proxy/pkg/proxy"
 )
@@ -16,8 +17,11 @@ func main() {
 	}
 	log.Printf("main: config: %+v", config)
 
+	// init dependencies
+	au := auth.New(config.Auth)
+
 	// init proxy and start
-	p := proxy.New(config.Proxy)
+	p := proxy.New(config.Proxy, au)
 	if err := p.Start(); err != nil {
 		log.Fatalf("main: proxy start: %v", err)
 	}
