@@ -16,11 +16,6 @@ import (
 	"time"
 )
 
-const (
-	defaultKeyPath  = "./sec/key.pem"
-	defaultCertPath = "./sec/cert.pem"
-)
-
 func main() {
 	log.Print("generate")
 
