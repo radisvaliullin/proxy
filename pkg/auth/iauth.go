@@ -1,5 +1,6 @@
 package auth
 
 type IAuth interface {
-	AuthZ(string) bool
+	AuthN(string) bool
+	AllClientsPerms() Clients
 }

@@ -167,8 +167,8 @@ func (a *Proxy) authzConn(conn net.Conn) (string, error) {
 		return "", errors.New("tls conn state, peer certificates not found")
 	}
 	id := cs.PeerCertificates[0].Subject.CommonName
-	if !a.auth.AuthZ(id) {
-		return "", errors.New("tls conn, cert common name not authz")
+	if !a.auth.AuthN(id) {
+		return "", errors.New("tls conn, cert common name not authn")
 	}
 
 	return id, nil

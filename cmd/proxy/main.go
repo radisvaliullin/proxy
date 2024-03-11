@@ -22,7 +22,7 @@ func main() {
 	au := auth.New(config.Auth)
 	// balancer
 	blnConf := balancer.Config{UpstrmAddrs: config.Proxy.UpstreamAddrs}
-	blncer := balancer.New(blnConf)
+	blncer := balancer.New(blnConf, au)
 
 	// init proxy and start
 	p := proxy.New(config.Proxy, au, blncer)
